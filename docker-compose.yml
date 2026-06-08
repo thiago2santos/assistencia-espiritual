@@ -1,0 +1,91 @@
+version: "3.9"
+
+name: ceov-stack
+
+services:
+
+  mongo:
+    image: mongo:6
+    container_name: ceov-mongo
+    restart: always
+    networks:
+      - ceov-net
+    ports:
+      - "27017:27017"
+    volumes:
+      - ceov-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: ceov-keycloak
+    restart: always
+    command: start-dev --import-realm
+    networks:
+      - ceov-net
+    environment:
+      KC_DB: dev-file
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    ports:
+      - "8081:8080"
+    volumes:
+      - ceov-keycloak-data:/opt/keycloak/data
+      - ./infra/keycloak/realm-ceov.json:/opt/keycloak/data/import/realm-ceov.json
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/realms/master"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    container_name: ceov-backend
+    build:
+      context: ./backend
+      dockerfile: src/main/docker/Dockerfile.native
+    networks:
+      - ceov-net
+    depends_on:
+      mongo:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    environment:
+      QUARKUS_MONGODB_CONNECTION_STRING: mongodb://mongo:27017
+      QUARKUS_MONGODB_DATABASE: ceov
+
+      QUARKUS_OIDC_AUTH_SERVER_URL: http://keycloak:8080/realms/ceov
+      QUARKUS_OIDC_CLIENT_ID: backend
+      QUARKUS_OIDC_APPLICATION_TYPE: service
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    command: ["sleep", "infinity"] # trocar pelo jar depois
+
+  frontend:
+    image: nginx:stable-alpine
+    container_name: ceov-frontend
+    depends_on:
+      - backend
+    networks:
+      - ceov-net
+    ports:
+      - "4200:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    restart: unless-stopped
+
+networks:
+  ceov-net:
+    name: ceov-network
+    driver: bridge
+
+volumes:
+  ceov-mongo-data:
+    name: ceov-mongo-data
+  ceov-keycloak-data:
+    name: ceov-keycloak-data

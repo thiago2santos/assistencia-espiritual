@@ -1,0 +1,72 @@
+version: "3.9"
+
+name: ceov-stack  # evita nomes "cagados" (prefixo do projeto)
+
+services:
+
+  mongo:
+    image: mongo:6
+    container_name: ceov-mongo
+    restart: always
+    networks:
+      - ceov-net
+    ports:
+      - "27017:27017"
+    volumes:
+      - ceov-mongo-data:/data/db
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: ceov-keycloak
+    restart: unless-stoped
+    command: start-dev
+    networks:
+      - ceov-net
+    environment:
+      KC_DB: dev-file
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8081:8080"
+    volumes:
+      - ceov-keycloak-data:/opt/keycloak/data
+      - ./keycloak/realm-ceov.json:/opt/keycloak/data/import/realm-ceov.json
+
+
+  backend:
+    image: ghcr.io/quarkusio/quarkus-micro-image:1.0
+    container_name: ceov-backend
+    depends_on:
+      - mongo
+      - keycloak
+    networks:
+      - ceov-net
+    environment:
+      MONGO_URL: mongodb://mongo:27017/ceov
+      KEYCLOAK_URL: http://keycloak:8080
+    ports:
+      - "8080:8080"
+    command: ["sleep", "infinity"] # trocar depois
+
+  frontend:
+    image: nginx:stable-alpine
+    container_name: ceov-frontend
+    depends_on:
+      - backend
+    networks:
+      - ceov-net
+    ports:
+      - "4200:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+
+networks:
+  ceov-net:
+    name: ceov-network   # nome fixo (sem hash)
+    driver: bridge
+
+volumes:
+  ceov-mongo-data:
+    name: ceov-mongo-data
+  ceov-keycloak-data:
+    name: ceov-keycloak-data

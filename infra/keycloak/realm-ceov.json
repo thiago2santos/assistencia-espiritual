@@ -1,0 +1,71 @@
+{
+    "realm": "ceov",
+    "enabled": true,
+    "roles": {
+        "realm": [
+            {
+                "name": "admin"
+            },
+            {
+                "name": "recepcionista-entrevista"
+            },
+            {
+                "name": "entrevistador"
+            },
+            {
+                "name": "recepcionista-palestra"
+            }
+        ]
+    },
+    "clients": [
+        {
+            "clientId": "backend",
+            "name": "ceov-backend",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "bearerOnly": false,
+            "standardFlowEnabled": true,
+            "directAccessGrantsEnabled": true,
+            "serviceAccountsEnabled": true,
+            "secret": "backend-secret",
+            "redirectUris": [
+                "http://localhost:8080/*"
+            ],
+            "webOrigins": [
+                "*"
+            ],
+            "protocolMappers": [
+                {
+                    "name": "realm roles",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-usermodel-realm-role-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "multivalued": "true",
+                        "userinfo.token.claim": "true",
+                        "access.token.claim": "true",
+                        "claim.name": "roles",
+                        "jsonType.label": "String"
+                    }
+                }
+            ]
+        }
+    ],
+    "users": [
+        {
+            "username": "admin",
+            "enabled": true,
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "admin",
+                    "temporary": false
+                }
+            ],
+            "realmRoles": [
+                "admin"
+            ]
+        }
+    ]
+}
